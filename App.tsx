@@ -6,6 +6,38 @@ import { TimeWheel } from './TimeWheel';
 import { playAlarmSequence, stopAlarmSequence, startSilentKeepAlive } from './sound';
 import { Play, Square, RotateCcw, Bell, Trash2, AlertTriangle, X, Check } from 'lucide-react';
 
+// -- WEB WORKER CODE --
+// We define this as a string and create a Blob to avoid file loading issues on some static hosts.
+// This worker runs in the background and is not paused by the "screen off" state as easily as the main thread.
+const WORKER_CODE = `
+self.onmessage = function(e) {
+  const { command, endTime } = e.data;
+
+  if (command === 'START') {
+    if (self.timerId) clearInterval(self.timerId);
+    
+    self.timerId = setInterval(() => {
+      const now = Date.now();
+      const diff = Math.ceil((endTime - now) / 1000);
+      
+      // Send the seconds left back to the main thread
+      self.postMessage({ type: 'TICK', secondsLeft: diff });
+
+      if (diff <= 0) {
+        clearInterval(self.timerId);
+        self.postMessage({ type: 'COMPLETE' });
+      }
+    }, 250); // Check 4 times a second for accuracy
+  } 
+  else if (command === 'STOP') {
+    if (self.timerId) {
+      clearInterval(self.timerId);
+      self.timerId = null;
+    }
+  }
+};
+`;
+
 export default function App() {
   const [status, setStatus] = useState<TimerStatus>(TimerStatus.IDLE);
   const [selectedMinutes, setSelectedMinutes] = useState(0);
@@ -15,9 +47,29 @@ export default function App() {
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   
-  const [endTime, setEndTime] = useState<number | null>(null);
+  // Reference to the Worker
+  const workerRef = useRef<Worker | null>(null);
 
-  const timerInterval = useRef<number | null>(null);
+  // Initialize Worker on Mount
+  useEffect(() => {
+    const blob = new Blob([WORKER_CODE], { type: 'application/javascript' });
+    workerRef.current = new Worker(URL.createObjectURL(blob));
+
+    // Listen for messages from the worker
+    workerRef.current.onmessage = (e) => {
+      const { type, secondsLeft: workerSeconds } = e.data;
+      
+      if (type === 'TICK') {
+        setSecondsLeft(workerSeconds > 0 ? workerSeconds : 0);
+      } else if (type === 'COMPLETE') {
+        completeTimer();
+      }
+    };
+
+    return () => {
+      if (workerRef.current) workerRef.current.terminate();
+    };
+  }, []);
 
   // -- NOTIFICATIONS --
   const requestNotificationPermission = async () => {
@@ -29,10 +81,14 @@ export default function App() {
   const sendNotification = () => {
     if ('Notification' in window && Notification.permission === 'granted') {
       try {
+        // We try to use the system notification sound as a backup
+        // if the main alarm is blocked by another app (like YouTube)
         new Notification("Reminder", {
           body: "Timer Finished! Check the stove.",
           requireInteraction: true,
-          icon: "/favicon.ico"
+          icon: "/favicon.ico",
+          // @ts-ignore - 'silent' is a valid option on some browsers
+          silent: false 
         });
       } catch (e) {
         console.error("Notification failed", e);
@@ -42,42 +98,20 @@ export default function App() {
 
   // -- TIMER LOGIC --
 
-  const tick = useCallback(() => {
-    if (!endTime) return;
-
-    const now = Date.now();
-    const diff = Math.ceil((endTime - now) / 1000);
-
-    if (diff <= 0) {
-      setSecondsLeft(0);
-      completeTimer();
-    } else {
-      setSecondsLeft(diff);
-    }
-  }, [endTime]);
-
   const completeTimer = () => {
-    if (timerInterval.current) clearInterval(timerInterval.current);
     setStatus(TimerStatus.COMPLETED);
     sendNotification();
 
-    // The silent audio has been playing this whole time.
-    // Now we switch it to the real alarm sequence.
+    // Trigger Vibrate on Android (if supported)
+    if (navigator.vibrate) {
+        navigator.vibrate([500, 200, 500, 200, 500]);
+    }
+
+    // Play the 3-ring sequence.
     playAlarmSequence(() => {
        stopAndReset();
     });
   };
-
-  useEffect(() => {
-    if (status === TimerStatus.RUNNING && endTime) {
-      timerInterval.current = window.setInterval(tick, 250);
-    }
-
-    return () => {
-      if (timerInterval.current) clearInterval(timerInterval.current);
-    };
-  }, [status, endTime, tick]);
-
 
   // -- HANDLERS --
 
@@ -88,15 +122,19 @@ export default function App() {
     // 1. Request Permission
     requestNotificationPermission();
 
-    // 2. Start Silent Keep-Alive Audio (Critical for Screen Off)
+    // 2. Start Silent Keep-Alive Audio (To keep Audio Context awake)
     startSilentKeepAlive();
 
     const now = Date.now();
     const targetTime = now + (totalMinutes * 60 * 1000);
     
-    setEndTime(targetTime);
     setSecondsLeft(totalMinutes * 60);
     setStatus(TimerStatus.RUNNING);
+
+    // 3. Start the Worker
+    if (workerRef.current) {
+        workerRef.current.postMessage({ command: 'START', endTime: targetTime });
+    }
   };
 
   const handleCancelRequest = () => {
@@ -120,11 +158,13 @@ export default function App() {
     // Stop audio immediately
     stopAlarmSequence();
     
-    if (timerInterval.current) clearInterval(timerInterval.current);
+    // Stop Worker
+    if (workerRef.current) {
+        workerRef.current.postMessage({ command: 'STOP' });
+    }
     
     setStatus(TimerStatus.IDLE);
     setSecondsLeft(0);
-    setEndTime(null);
     setShowCancelConfirm(false);
 
     setSelectedMinutes(0);
@@ -291,7 +331,7 @@ export default function App() {
             <div className="text-center space-y-2">
               <p className="text-slate-400 uppercase tracking-widest text-sm font-bold">Timer Running</p>
               <div className="inline-block bg-slate-800 px-4 py-1 rounded-full">
-                 <p className="text-emerald-400 text-xs font-bold animate-pulse">Screen Safe Mode</p>
+                 <p className="text-emerald-400 text-xs font-bold animate-pulse">Running in Background</p>
               </div>
             </div>
 

@@ -46,7 +46,8 @@
 </head>
   <body>
     <div id="root"></div>
-    <audio id="alarm-sound" preload="auto">
+    <!-- Added playsinline, x-webkit-airplay to help with background execution on iOS -->
+    <audio id="alarm-sound" preload="auto" playsinline x-webkit-airplay="allow">
       <source src="https://www.soundjay.com/clock/sounds/alarm-clock-01.mp3" type="audio/mpeg">
     </audio>
     <script type="module" src="/index.tsx"></script>

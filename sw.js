@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reminder-app-v21-final-fix';
+const CACHE_NAME = 'reminder-app-v22-worker-fix';
 
 // Only cache the absolute essentials during install.
 const CORE_ASSETS = [

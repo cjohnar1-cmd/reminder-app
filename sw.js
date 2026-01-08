@@ -1,8 +1,6 @@
-const CACHE_NAME = 'reminder-app-v17-stable';
+const CACHE_NAME = 'reminder-app-v18-structure-fix';
 
 // Only cache the absolute essentials during install.
-// We DO NOT cache 'assets/index.js' here because in Development mode it doesn't exist,
-// causing a 404 which breaks the entire app installation.
 const CORE_ASSETS = [
   '/',
   '/index.html',
@@ -67,7 +65,7 @@ self.addEventListener('fetch', (event) => {
 
         return networkResponse;
       }).catch(() => {
-        // Fallback for missing images/assets if needed
+        // Fallback
       });
     })
   );

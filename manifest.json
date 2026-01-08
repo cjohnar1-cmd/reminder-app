@@ -1,0 +1,20 @@
+{
+  "short_name": "Reminder",
+  "name": "Reminder",
+  "icons": [
+    {
+      "src": "https://ui-avatars.com/api/?name=R&background=DC2626&color=FBBF24&size=192&bold=true&length=1&font-size=0.7",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "https://ui-avatars.com/api/?name=R&background=DC2626&color=FBBF24&size=512&bold=true&length=1&font-size=0.7",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#020617",
+  "background_color": "#020617"
+}

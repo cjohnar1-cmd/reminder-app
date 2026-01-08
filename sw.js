@@ -1,15 +1,12 @@
-const CACHE_NAME = 'reminder-app-v14-cloudflare';
-const ASSETS = [
+const CACHE_NAME = 'reminder-app-v17-stable';
+
+// Only cache the absolute essentials during install.
+// We DO NOT cache 'assets/index.js' here because in Development mode it doesn't exist,
+// causing a 404 which breaks the entire app installation.
+const CORE_ASSETS = [
   '/',
   '/index.html',
-  '/manifest.json',
-  '/assets/index.js',
-  // '/assets/index.css', // Removed because we use Tailwind CDN and no local CSS is generated
-  'https://cdn.tailwindcss.com',
-  'https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap',
-  'https://www.soundjay.com/clock/sounds/alarm-clock-01.mp3',
-  'https://ui-avatars.com/api/?name=R&background=DC2626&color=FBBF24&size=192&bold=true&length=1&font-size=0.7',
-  'https://ui-avatars.com/api/?name=R&background=DC2626&color=FBBF24&size=512&bold=true&length=1&font-size=0.7'
+  '/manifest.json'
 ];
 
 self.addEventListener('install', (event) => {
@@ -17,36 +14,9 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        return cache.addAll(ASSETS).catch(err => {
-            console.warn('Some assets failed to precache:', err);
-        });
+        return cache.addAll(CORE_ASSETS);
       })
-  );
-});
-
-self.addEventListener('fetch', (event) => {
-  event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-      return fetch(event.request).then((networkResponse) => {
-        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic' && networkResponse.type !== 'cors' && networkResponse.type !== 'opaque') {
-          return networkResponse;
-        }
-        const responseToCache = networkResponse.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          try {
-             cache.put(event.request, responseToCache);
-          } catch (err) {
-             console.warn('Failed to cache runtime request', err);
-          }
-        });
-        return networkResponse;
-      }).catch(() => {
-        console.log('Offline fetch failed:', event.request.url);
-      });
-    })
+      .catch(err => console.error('SW Install failed:', err))
   );
 });
 
@@ -56,6 +26,7 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME) {
+            console.log('Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
@@ -63,4 +34,41 @@ self.addEventListener('activate', (event) => {
     })
   );
   self.clients.claim();
+});
+
+self.addEventListener('fetch', (event) => {
+  // Navigation: Network First, then Cache (for updates)
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .catch(() => {
+          return caches.match('/index.html');
+        })
+    );
+    return;
+  }
+
+  // Assets: Cache First, then Network
+  event.respondWith(
+    caches.match(event.request).then((cachedResponse) => {
+      if (cachedResponse) {
+        return cachedResponse;
+      }
+
+      return fetch(event.request).then((networkResponse) => {
+        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
+          return networkResponse;
+        }
+
+        const responseToCache = networkResponse.clone();
+        caches.open(CACHE_NAME).then((cache) => {
+          cache.put(event.request, responseToCache);
+        });
+
+        return networkResponse;
+      }).catch(() => {
+        // Fallback for missing images/assets if needed
+      });
+    })
+  );
 });

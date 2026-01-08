@@ -5,11 +5,13 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   build: {
-    // We force fixed filenames so our simple sw.js can find them easily
     rollupOptions: {
       output: {
-        entryFileNames: 'assets/[name].js',
-        chunkFileNames: 'assets/[name].js',
+        // Force all code (React + App) into a single file named 'index.js'
+        // This ensures the Service Worker always finds exactly what it expects.
+        manualChunks: () => 'index',
+        entryFileNames: 'assets/index.js',
+        chunkFileNames: 'assets/index.js',
         assetFileNames: 'assets/[name].[ext]'
       }
     }

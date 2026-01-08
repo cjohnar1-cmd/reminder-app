@@ -1,10 +1,10 @@
-const CACHE_NAME = 'reminder-app-v13-cloudflare';
+const CACHE_NAME = 'reminder-app-v14-cloudflare';
 const ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
   '/assets/index.js',
-  '/assets/index.css',
+  // '/assets/index.css', // Removed because we use Tailwind CDN and no local CSS is generated
   'https://cdn.tailwindcss.com',
   'https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap',
   'https://www.soundjay.com/clock/sounds/alarm-clock-01.mp3',

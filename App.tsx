@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { TimerStatus } from './types';
-import { Button } from './components/Button';
-import { TimerDisplay } from './components/TimerDisplay';
-import { TimeWheel } from './components/TimeWheel';
-import { playAlarmSequence, stopAlarmSequence } from './utils/sound';
-import { Play, Square, RotateCcw, Bell, Trash2, AlertTriangle, X, Check, Clock } from 'lucide-react';
+import { Button } from './Button';
+import { TimerDisplay } from './TimerDisplay';
+import { TimeWheel } from './TimeWheel';
+import { playAlarmSequence, stopAlarmSequence } from './sound';
+import { Play, Square, RotateCcw, Bell, Trash2, AlertTriangle, X, Check } from 'lucide-react';
 
 export default function App() {
   const [status, setStatus] = useState<TimerStatus>(TimerStatus.IDLE);

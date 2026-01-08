@@ -3,14 +3,14 @@ import { TimerStatus } from './types';
 import { Button } from './Button';
 import { TimerDisplay } from './TimerDisplay';
 import { TimeWheel } from './TimeWheel';
-import { playAlarmSequence, stopAlarmSequence } from './sound';
+import { playAlarmSequence, stopAlarmSequence, startSilentKeepAlive } from './sound';
 import { Play, Square, RotateCcw, Bell, Trash2, AlertTriangle, X, Check } from 'lucide-react';
 
 export default function App() {
   const [status, setStatus] = useState<TimerStatus>(TimerStatus.IDLE);
   const [selectedMinutes, setSelectedMinutes] = useState(0);
   const [selectedHours, setSelectedHours] = useState(0);
-  const [showHours, setShowHours] = useState(false); // Toggle for Extended Time
+  const [showHours, setShowHours] = useState(false); 
   
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
@@ -61,9 +61,8 @@ export default function App() {
     setStatus(TimerStatus.COMPLETED);
     sendNotification();
 
-    // Play the 3-ring sequence.
-    // We pass 'stopAndReset' as the callback. 
-    // This means when the 3rd ring finishes, the app automatically resets.
+    // The silent audio has been playing this whole time.
+    // Now we switch it to the real alarm sequence.
     playAlarmSequence(() => {
        stopAndReset();
     });
@@ -86,7 +85,11 @@ export default function App() {
     const totalMinutes = (selectedHours * 60) + selectedMinutes;
     if (totalMinutes <= 0) return;
     
+    // 1. Request Permission
     requestNotificationPermission();
+
+    // 2. Start Silent Keep-Alive Audio (Critical for Screen Off)
+    startSilentKeepAlive();
 
     const now = Date.now();
     const targetTime = now + (totalMinutes * 60 * 1000);
@@ -96,10 +99,8 @@ export default function App() {
     setStatus(TimerStatus.RUNNING);
   };
 
-  // Called when Cancel/Reset is clicked
   const handleCancelRequest = () => {
     if (status === TimerStatus.RUNNING) {
-      // Two-step authentication
       setShowCancelConfirm(true);
     } else {
       stopAndReset();
@@ -116,18 +117,16 @@ export default function App() {
   };
 
   const stopAndReset = () => {
-    // This immediately kills the sound and the timeouts
+    // Stop audio immediately
     stopAlarmSequence();
     
     if (timerInterval.current) clearInterval(timerInterval.current);
     
-    // 1. Reset Status
     setStatus(TimerStatus.IDLE);
     setSecondsLeft(0);
     setEndTime(null);
     setShowCancelConfirm(false);
 
-    // 2. TOTAL CLEAN SLATE: Reset Dials to 0
     setSelectedMinutes(0);
     setSelectedHours(0);
   };
@@ -153,7 +152,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col max-w-lg mx-auto shadow-2xl border-x-2 border-slate-900 relative">
       
-      {/* CONFIRMATION MODAL OVERLAY */}
+      {/* CONFIRMATION MODAL */}
       {showCancelConfirm && (
         <div className="absolute inset-0 z-50 bg-slate-950/90 flex items-center justify-center p-4 backdrop-blur-md animate-fade-in">
           <div className="bg-slate-900 border-4 border-amber-500 rounded-3xl p-6 w-full shadow-2xl flex flex-col gap-8">
@@ -201,7 +200,7 @@ export default function App() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col p-4 gap-6">
 
-        {/* --- IDLE STATE: SELECTION --- */}
+        {/* --- IDLE STATE --- */}
         {!isRunning && !isRinging && (
           <div className="flex flex-col gap-6 animate-fade-in h-full">
             
@@ -217,7 +216,6 @@ export default function App() {
                 <span className="text-2xl text-slate-500 font-bold">min</span>
               </div>
               
-              {/* HOUR TOGGLE BUTTON */}
               <button 
                 onClick={toggleHours}
                 className={`
@@ -231,9 +229,7 @@ export default function App() {
               </button>
             </div>
 
-            {/* THE WHEELS */}
             <div className="flex gap-4">
-                {/* HOURS WHEEL (Conditional) */}
                 {showHours && (
                     <div className="flex-1 flex flex-col gap-2">
                         <TimeWheel 
@@ -247,7 +243,6 @@ export default function App() {
                     </div>
                 )}
                 
-                {/* MINUTES WHEEL */}
                 <div className="flex-1 flex flex-col gap-2">
                     <TimeWheel 
                         range={60} 
@@ -260,9 +255,7 @@ export default function App() {
                 </div>
             </div>
 
-            {/* ACTION BUTTONS */}
             <div className="grid grid-cols-3 gap-4 mt-auto mb-4">
-               {/* CLEAR BUTTON */}
                <button 
                  onClick={clearSelection}
                  disabled={totalSelectedMinutes === 0}
@@ -272,7 +265,6 @@ export default function App() {
                  <span className="text-sm font-bold mt-1">CLEAR</span>
                </button>
 
-               {/* START BUTTON */}
                <button 
                  onClick={startTimer}
                  disabled={totalSelectedMinutes === 0}
@@ -299,7 +291,7 @@ export default function App() {
             <div className="text-center space-y-2">
               <p className="text-slate-400 uppercase tracking-widest text-sm font-bold">Timer Running</p>
               <div className="inline-block bg-slate-800 px-4 py-1 rounded-full">
-                 <p className="text-emerald-400 text-xs font-bold">Background Active</p>
+                 <p className="text-emerald-400 text-xs font-bold animate-pulse">Screen Safe Mode</p>
               </div>
             </div>
 
@@ -308,7 +300,6 @@ export default function App() {
               isHighAlert={false} 
             />
             
-            {/* CANCEL BUTTON - Triggers Confirmation Modal */}
             <Button 
               label="CANCEL TIMER" 
               onClick={handleCancelRequest} 

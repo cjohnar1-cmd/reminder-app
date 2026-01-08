@@ -1,10 +1,11 @@
-const CACHE_NAME = 'reminder-app-v19-root-fix';
+const CACHE_NAME = 'reminder-app-v20-offline-styles';
 
 // Only cache the absolute essentials during install.
 const CORE_ASSETS = [
   '/',
   '/index.html',
-  '/manifest.json'
+  '/manifest.json',
+  'https://cdn.tailwindcss.com' // Cache this so the app doesn't look broken offline
 ];
 
 self.addEventListener('install', (event) => {
